@@ -20,7 +20,6 @@ module.exports.likeProducts = (req, res) => {
         .catch(() => {
             res.send({ message: 'server err' })
         })
-
 }
 
 module.exports.signup = (req, res) => {
@@ -36,7 +35,6 @@ module.exports.signup = (req, res) => {
         .catch(() => {
             res.send({ message: 'server err' })
         })
-
 }
 
 module.exports.myProfileById = (req, res) => {
