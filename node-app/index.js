@@ -1,3 +1,4 @@
+require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
 const path = require('path');
@@ -25,9 +26,14 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 
-const port = 4000
+const port = process.env.PORT || 4000
 const mongoose = require('mongoose');
-mongoose.connect('mongodb+srv://ayushgarg678:uNbLPmZSDAR54fpZ@cluster0.um632kc.mongodb.net/')
+
+if (!process.env.MONGO_URI) {
+    console.error('MONGO_URI is not set. Copy .env.example to .env and fill it in.')
+    process.exit(1)
+}
+mongoose.connect(process.env.MONGO_URI)
 
 app.get('/', (req, res) => {
     res.send('hello...')

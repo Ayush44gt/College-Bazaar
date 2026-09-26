@@ -1,0 +1,22 @@
+# dependencies
+node_modules/
+
+# environment — never commit real credentials
+.env
+.env.*
+!.env.example
+
+# runtime upload artifacts
+node-app/uploads/*
+!node-app/uploads/.gitkeep
+
+# build output
+build/
+dist/
+
+# logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
