@@ -180,7 +180,7 @@ async function seed() {
     await Promise.all([Users.syncIndexes(), Products.syncIndexes()]);
 
     const password = await bcrypt.hash(DEMO_PASSWORD, 10);
-    const users = await Users.insertMany(USERS.map(([username, college, city, extra], i) => ({
+    const users = await Users.insertMany(USERS.map(([username, college, , extra], i) => ({
         username, college, password,
         email: username + '@example.com',
         mobile: '90000000' + String(10 + i),
@@ -190,7 +190,7 @@ async function seed() {
     })));
 
     const cityOf = {};
-    USERS.forEach(([username, , city], i) => { cityOf[users[i]._id] = city });
+    USERS.forEach(([, , city], i) => { cityOf[users[i]._id] = city });
 
     const sellers = users.filter((u, i) => u.role !== 'admin' && !USERS[i][3].noListings && u.status === 'active');
     const blocked = users.find((u) => u.status === 'blocked');
@@ -210,7 +210,7 @@ async function seed() {
 
         products.push({
             pname, pdesc, price, category, condition, city,
-            status: i % 7 === 3 ? 'sold' : 'available',
+            status: i % 7 === 4 ? 'sold' : 'available',
             pimage: 'image/' + saved[0]._id,
             pimage2: saved[1] ? 'image/' + saved[1]._id : undefined,
             addedBy: seller._id,
