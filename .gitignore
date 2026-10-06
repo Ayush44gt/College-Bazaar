@@ -6,10 +6,6 @@ node_modules/
 .env.*
 !.env.example
 
-# runtime upload artifacts
-node-app/uploads/*
-!node-app/uploads/.gitkeep
-
 # build output
 build/
 dist/

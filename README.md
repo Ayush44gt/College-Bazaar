@@ -1,11 +1,10 @@
 # College Bazaar
 
-> A campus marketplace where students buy and sell used books, electronics and accessories within their own college.
+> A campus marketplace where students buy and sell used books, electronics and hostel essentials.
 
 Textbooks, cycles, laptops and hostel furniture change hands constantly on a
 campus — usually through noisy WhatsApp groups where listings scroll away in a
-day. College Bazaar gives that trade a searchable home, scoped to people you
-actually share a campus with.
+day. College Bazaar gives that trade a searchable home.
 
 ```
 React 18 · React Router · Node.js · Express · MongoDB · JWT · Multer
@@ -15,32 +14,14 @@ React 18 · React Router · Node.js · Express · MongoDB · JWT · Multer
 
 ## Features
 
-- **Post an item** in seconds — title, description, price, category and up to two photos
-- **Browse by category** — Bikes, Mobiles, Laptops, Electronics, Cloth, Plots, Rent, To Let, Sale
-- **Search** across listing titles and descriptions
-- **Location-aware listings** — each product carries GeoJSON coordinates, indexed for proximity queries
-- **Like and save** items to revisit later
-- **Seller profiles** — see everything a given student has listed, and contact them
-- **My listings** — manage what you've posted
-
----
-
-## Notable details
-
-**Listings are geo-indexed, not just tagged with a place name.** Each product
-stores its location as a GeoJSON `Point` with a `2dsphere` index on
-`pLoc`, so "what's for sale near me" is a MongoDB proximity query rather than a
-string match on a city field — and it stays correct across campuses in the same
-city.
-
-**Two images per listing, handled at the edge of the request.** `multer`'s
-`upload.fields` accepts `pimage` and `pimage2` in one multipart request, so a
-seller uploads a front and back shot in a single submit rather than a two-step
-flow.
-
-**Auth is stateless.** Signup hashes the password, login returns a JWT, and the
-client attaches it to subsequent calls — no server-side session store to keep
-in sync.
+- **Browse** listings by category and city, **search** titles and descriptions, and **sort** by date or price
+- **Post an item** with a title, description, price, category, condition, city and up to two photos
+- **Manage your listings** — edit, mark as sold, relist or delete
+- **Save** listings with the heart and find them again under Saved
+- **Contact sellers** — phone and email are shown to logged-in users only
+- **Profile** — update your contact details and change your password
+- **Admin** — stats, a user table (block / unblock) and a listings table (delete)
+- Responsive layout, light and dark themes, loading skeletons, empty and error states
 
 ---
 
@@ -50,97 +31,93 @@ in sync.
 college-bazaar/
 ├── node-app/                    # Express API
 │   ├── controllers/
-│   │   ├── productController.js # listings: add, search, fetch, mine
-│   │   └── userController.js    # signup, login, profile, likes
-│   ├── uploads/                 # multipart image destination
+│   │   ├── productController.js # listings and images
+│   │   └── userController.js    # accounts, saved listings, admin
+│   ├── middleware/              # login check and error handling
+│   ├── models/                  # User, Product, Image
+│   ├── constants.js             # categories, conditions, cities
+│   ├── seed.js                  # demo data
 │   └── index.js                 # app wiring and routes
 └── react-app/                   # React client
-    └── src/components/
-        ├── Home.jsx             # feed
-        ├── Categories.jsx       # category browsing
-        ├── CategoryPage.jsx
-        ├── AddProduct.jsx       # create a listing
-        ├── ProductDetail.jsx
-        ├── MyProducts.jsx
-        ├── LikedProducts.jsx
-        ├── MyProfile.jsx
-        └── Login.jsx / Signup.jsx
+    └── src/
+        ├── components/          # one file per page, plus Layout and shared ui
+        ├── store.jsx            # logged-in user, saved listings, city, toasts
+        ├── constants.js         # API URL, categories, cities
+        └── index.css            # the whole design system
 ```
 
 ### Data model
 
 | Model | Fields |
 |---|---|
-| **Products** | `pname`, `pdesc`, `price`, `category`, `pimage`, `pimage2`, `addedBy`, `pLoc` (GeoJSON `Point`, `2dsphere` indexed) |
-| **Users** | `name`, `email`, `password`, `likedProducts[]` |
+| **Users** | `username`, `email`, `mobile`, `college`, `password` (bcrypt hash), `role` (`user` / `admin`), `status` (`active` / `blocked`), `likedProducts[]` |
+| **Products** | `pname`, `pdesc`, `price`, `category`, `condition`, `status` (`available` / `sold`), `pimage`, `pimage2`, `addedBy`, `city`, `pLoc` (GeoJSON `Point`, `2dsphere` indexed) |
+| **Images** | `data` (binary), `contentType` |
+
+Photos are stored in MongoDB, so nothing is written to the server's disk.
+Listings from a blocked account are hidden from everyone.
 
 ---
 
 ## API
 
-| Method | Route | Purpose |
-|---|---|---|
-| `POST` | `/signup` | Create an account |
-| `POST` | `/login` | Authenticate, returns a JWT |
-| `GET` | `/get-user/:uId` | Public profile for a seller |
-| `GET` | `/my-profile/:userId` | The caller's profile |
-| `POST` | `/add-product` | Create a listing (multipart: `pimage`, `pimage2`) |
-| `GET` | `/get-products` | All listings |
-| `GET` | `/get-product/:pId` | A single listing |
-| `GET` | `/search?...` | Search listings |
-| `POST` | `/my-products` | Listings created by a user |
-| `POST` | `/like-product` | Like or unlike a listing |
-| `POST` | `/liked-products` | The caller's liked listings |
+| Method | Route | Login | Purpose |
+|---|---|---|---|
+| `POST` | `/signup` | | Create an account |
+| `POST` | `/login` | | Returns a JWT |
+| `GET` | `/my-profile` | yes | The caller's profile and stats |
+| `POST` | `/update-profile` | yes | Change email, mobile, college |
+| `POST` | `/change-password` | yes | Change password |
+| `GET` | `/get-user/:uId` | | A seller's public details |
+| `GET` | `/seller-contact/:uId` | yes | A seller's phone and email |
+| `GET` | `/get-products` | | Listings. Query: `catName`, `search`, `loc` (`lat,lng`), `sort`, `status`, `seller`, `page`, `limit` |
+| `GET` | `/get-product/:pId` | | A single listing |
+| `GET` | `/image/:imageId` | | A listing photo |
+| `POST` | `/add-product` | yes | Create a listing (multipart: `pimage`, `pimage2`) |
+| `POST` | `/edit-product/:pId` | owner / admin | Update a listing |
+| `POST` | `/product-status/:pId` | owner / admin | Mark as `sold` or `available` |
+| `POST` | `/delete-product/:pId` | owner / admin | Delete a listing |
+| `POST` | `/my-products` | yes | The caller's listings |
+| `POST` | `/like-product`, `/unlike-product` | yes | Save or un-save a listing |
+| `POST` | `/liked-products` | yes | The caller's saved listings |
+| `GET` | `/admin/stats`, `/admin/users`, `/admin/products` | admin | Admin page data |
+| `POST` | `/admin/user-status/:uId` | admin | Block or unblock a user |
 
 ---
 
 ## Running it locally
 
-**Prerequisites:** Node.js 18+ and a MongoDB instance (local or Atlas).
-
-```bash
-git clone https://github.com/Ayush44gt/College-Bazaar.git
-cd College-Bazaar
-```
+**Prerequisites:** Node.js 18+ and a MongoDB database (Atlas or local).
 
 **API**
 
 ```bash
 cd node-app
 npm install
-```
-
-Create `node-app/.env`:
-
-```env
-PORT=5000
-MONGO_URI=mongodb://localhost:27017/college-bazaar
-JWT_SECRET=your_jwt_signing_secret
-```
-
-```bash
-npx nodemon index.js      # http://localhost:5000
+cp .env.example .env      # then fill in MONGO_URI and JWT_SECRET
+npm run seed              # optional: load demo data (wipes the database first)
+npm run dev               # http://localhost:4000
 ```
 
 **Client**
 
 ```bash
-cd ../react-app
+cd react-app
 npm install
 npm start                 # http://localhost:3000
 ```
 
-The API base URL lives in `react-app/src/constants.js`.
+### Demo data
 
----
+`npm run seed` creates 15 users and about 70 listings across eight cities.
+Every demo account uses the password `demo1234`:
 
-## Tech stack
-
-| Layer | Choices |
+| Username | What it shows |
 |---|---|
-| **Frontend** | React 18, React Router 6, Axios, react-icons |
-| **Backend** | Node.js, Express, Mongoose, JWT, multer, body-parser, CORS |
-| **Database** | MongoDB with a `2dsphere` geospatial index |
+| `admin` | The admin page |
+| `aarav_sharma` | A seller with many listings, some sold |
+| `newbie_01` | A new account with nothing listed or saved |
+| `spam_seller` | A blocked account: cannot log in, listings hidden |
 
 ---
 

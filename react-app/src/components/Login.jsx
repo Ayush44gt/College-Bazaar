@@ -1,82 +1,90 @@
-import { Link, useNavigate } from "react-router-dom";
-import Header from "./Header";
 import { useState } from "react";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import API_URL from "../constants";
-import { FaUser, FaLock } from "react-icons/fa";
+import { useApp } from "../store";
+import { errorMessage } from "../utils";
+import { Field } from "./ui";
 
 function Login() {
-    const navigate = useNavigate()
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const { user, login, toast } = useApp();
 
-    const [username, setusername] = useState('');
-    const [password, setpassword] = useState('');
+  const [username, setusername] = useState('');
+  const [password, setpassword] = useState('');
+  const [error, seterror] = useState('');
+  const [busy, setbusy] = useState(false);
 
-    const handleApi = () => {
-        const url = API_URL + '/login';
-        const data = { username, password };
-        axios.post(url, data)
-            .then((res) => {
-                if (res.data.message) {
-                    if (res.data.token) {
-                        localStorage.setItem('token', res.data.token);
-                        localStorage.setItem('userId', res.data.userId);
-                        navigate('/');
-                    }
-                }
-            })
-            .catch((err) => {
-                alert('SERVER ERR')
-            })
+  // only follow links back into this site
+  const requested = params.get('next') || '/';
+  const next = requested.startsWith('/') && !requested.startsWith('//') ? requested : '/';
+
+  if (user) {
+    return <Navigate to={next} replace />;
+  }
+
+  const handleApi = (e) => {
+    e.preventDefault();
+    if (!username.trim() || !password) {
+      seterror('Enter your username and password.');
+      return;
     }
-    return (
-        <div style={{ backgroundColor: "#f5f5f5", minHeight: "100vh" }}>
-        <Header />
-        <div className="container d-flex justify-content-center align-items-center" style={{ minHeight: "80vh" }}>
-          <div className="card shadow p-4" style={{ width: "100%", maxWidth: "400px" }}>
-            <h3 className="text-center mb-4 text-primary">Welcome to Login Page</h3>
-  
-            <div className="mb-3">
-              <label className="form-label">Username</label>
-              <div className="input-group">
-                <span className="input-group-text"><FaUser /></span>
-                <input
-                  className="form-control"
-                  type="text"
-                  value={username}
-                  placeholder="Enter username"
-                  onChange={(e) => setusername(e.target.value)}
-                />
-              </div>
-            </div>
-  
-            <div className="mb-3">
-              <label className="form-label">Password</label>
-              <div className="input-group">
-                <span className="input-group-text"><FaLock /></span>
-                <input
-                  className="form-control"
-                  type="password"
-                  value={password}
-                  placeholder="Enter password"
-                  onChange={(e) => setpassword(e.target.value)}
-                />
-              </div>
-            </div>
-  
-            <button className="btn btn-primary w-100 mb-3" onClick={handleApi}>
-              Login
-            </button>
-  
-            <div className="text-center">
-              <span>Don't have an account?</span>
-              <Link className="ms-2 text-decoration-none text-success" to="/signup">
-                Sign Up
-              </Link>
-            </div>
-          </div>
+    setbusy(true);
+    seterror('');
+    axios.post(API_URL + '/login', { username, password })
+      .then((res) => {
+        login(res.data);
+        toast('Welcome back, ' + res.data.username + '.');
+        navigate(next, { replace: true });
+      })
+      .catch((err) => {
+        seterror(errorMessage(err));
+        setbusy(false);
+      });
+  };
+
+  return (
+    <div className="auth">
+      <form className="panel auth-card" onSubmit={handleApi} noValidate>
+        <h1>Welcome back</h1>
+        <p className="muted">Log in to sell, save listings and contact sellers.</p>
+
+        {params.get('expired') && !error && (
+          <div className="alert alert-info">Please log in again to continue.</div>
+        )}
+        {error && <div className="alert" role="alert">{error}</div>}
+
+        <Field label="Username">
+          <input
+            className="input"
+            type="text"
+            autoComplete="username"
+            autoFocus
+            value={username}
+            onChange={(e) => setusername(e.target.value)}
+          />
+        </Field>
+        <Field label="Password">
+          <input
+            className="input"
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setpassword(e.target.value)}
+          />
+        </Field>
+
+        <button className="btn btn-block" type="submit" disabled={busy}>
+          {busy ? 'Logging in…' : 'Log in'}
+        </button>
+
+        <div className="auth-foot">
+          New here? <Link className="link" to="/signup">Create an account</Link>
         </div>
-      </div>
-    )
+      </form>
+    </div>
+  );
 }
 
 export default Login;

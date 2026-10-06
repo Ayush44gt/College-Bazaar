@@ -1,131 +1,70 @@
-import { useEffect, useState } from "react";
-import Header from "./Header";
-// import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import axios from "axios";
-import Categories from "./Categories";
-import { FaHeart } from "react-icons/fa";
-import './Home.css';
+import { FiAlertTriangle, FiHeart } from "react-icons/fi";
 import API_URL from "../constants";
-
+import { useApp } from "../store";
+import { errorMessage } from "../utils";
+import { GridSkeleton, ProductCard, State } from "./ui";
 
 function LikedProducts() {
+  const { liked } = useApp();
+  const [products, setproducts] = useState([]);
+  const [status, setstatus] = useState('loading');
+  const [error, seterror] = useState('');
 
-    // const navigate = useNavigate()
+  const load = useCallback(() => {
+    setstatus('loading');
+    axios.post(API_URL + '/liked-products', {})
+      .then((res) => {
+        setproducts(res.data.products);
+        setstatus('ready');
+      })
+      .catch((err) => {
+        seterror(errorMessage(err));
+        setstatus('error');
+      });
+  }, []);
 
-    const [products, setproducts] = useState([]);
-    const [cproducts, setcproducts] = useState([]);
-    const [search, setsearch] = useState('');
+  useEffect(() => {
+    load();
+  }, [load]);
 
+  // listings disappear from this page as soon as they are un-saved
+  const shown = products.filter((item) => liked.has(item._id));
 
-    useEffect(() => {
-        const url = API_URL + '/liked-products';
-        let data = { userId: localStorage.getItem('userId') }
-        axios.post(url, data)
-            .then((res) => {
-                if (res.data.products) {
-                    setproducts(res.data.products);
-                }
-            })
-            .catch((err) => {
-                alert('Server Err.')
-            })
-    }, [])
-
-    const handlesearch = (value) => {
-        setsearch(value);
-    }
-
-    const handleClick = () => {
-        // eslint-disable-next-line array-callback-return
-        let filteredProducts = products.filter((item) => {
-            if (item.pname.toLowerCase().includes(search.toLowerCase()) ||
-                item.pdesc.toLowerCase().includes(search.toLowerCase()) ||
-                item.category.toLowerCase().includes(search.toLowerCase())) {
-                return item;
-            }
-        })
-        setcproducts(filteredProducts)
-
-    }
-
-    const handleCategory = (value) => {
-        // eslint-disable-next-line array-callback-return
-        let filteredProducts = products.filter((item) => {
-            if (item.category === value) {
-                return item;
-            }
-        })
-        setcproducts(filteredProducts)
-    }
-
-    const handleLike = (productId) => {
-        let userId = localStorage.getItem('userId');
-
-        const url = API_URL + '/like-product';
-        const data = { userId, productId }
-        axios.post(url, data)
-            .then((res) => {
-                if (res.data.message) {
-                    alert('Liked.')
-                }
-            })
-            .catch((err) => {
-                alert('Server Err.')
-            })
-
-    }
-
-
-    return (
+  return (
+    <div className="page">
+      <div className="toolbar">
         <div>
-            <Header search={search} handlesearch={handlesearch} handleClick={handleClick} />
-            <Categories handleCategory={handleCategory} />
-            <h5> SEARCH RESULTS </h5>
-            <div className="d-flex justify-content-center flex-wrap">
-                {cproducts && products.length > 0 &&
-                    cproducts.map((item, index) => {
-
-                        return (
-                            <div key={item._id} className="card m-3 ">
-                                <div onClick={() => handleLike(item._id)} className="icon-con">
-                                    <FaHeart className="icons" />
-                                </div>
-                                <img alt="img" width="300px" height="200px" src={API_URL + '/' + item.pimage} />
-
-                                <p className="m-2"> {item.pname}  | {item.category} </p>
-                                <h3 className="m-2 text-danger"> {item.price} </h3>
-                                <p className="m-2 text-success"> {item.pdesc} </p>
-                            </div>
-                        )
-
-                    })}
-            </div>
-
-            <h5> ALL RESULTS  </h5>
-
-            <div className="d-flex justify-content-center flex-wrap">
-                {products && products.length > 0 &&
-                    products.map((item, index) => {
-
-                        return (
-                            <div key={item._id} className="card m-3 ">
-                                <div onClick={() => handleLike(item._id)} className="icon-con">
-                                    <FaHeart className="icons" />
-                                </div>
-                                <img alt="img" width="300px" height="200px" src={API_URL + '/' + item.pimage} />
-                                <p className="m-2"> {item.pname}  | {item.category} </p>
-                                <h3 className="m-2 text-danger"> {item.price} </h3>
-                                <p className="m-2 text-success"> {item.pdesc} </p>
-                            </div>
-                        )
-
-                    })}
-            </div>
-
-
-
+          <h1>Saved listings</h1>
+          <span className="muted small">
+            {status === 'ready' ? `${shown.length} saved` : 'Items you saved to come back to.'}
+          </span>
         </div>
-    )
+      </div>
+
+      {status === 'loading' && <GridSkeleton count={4} />}
+
+      {status === 'error' && (
+        <State error icon={<FiAlertTriangle />} title="Could not load your saved listings" text={error}>
+          <button className="btn" onClick={load}>Try again</button>
+        </State>
+      )}
+
+      {status === 'ready' && shown.length === 0 && (
+        <State icon={<FiHeart />} title="No saved listings yet" text="Tap the heart on any listing to keep it here for later.">
+          <Link className="btn" to="/">Browse listings</Link>
+        </State>
+      )}
+
+      {status === 'ready' && shown.length > 0 && (
+        <div className="grid">
+          {shown.map((item) => <ProductCard key={item._id} item={item} />)}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default LikedProducts;

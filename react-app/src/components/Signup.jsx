@@ -1,108 +1,98 @@
-import { Link } from "react-router-dom";
-import Header from "./Header";
 import { useState } from "react";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import axios from "axios";
 import API_URL from "../constants";
-import { FaUser, FaPhone, FaEnvelope, FaLock } from "react-icons/fa";
+import { useApp } from "../store";
+import { errorMessage } from "../utils";
+import { Field } from "./ui";
+
+const validate = ({ username, email, mobile, college, password }) => {
+  const errors = {};
+  if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) errors.username = '3-20 letters, numbers or underscores.';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = 'Enter a valid email address.';
+  if (!/^[0-9]{10}$/.test(mobile)) errors.mobile = 'Enter a 10-digit mobile number.';
+  if (college.trim().length < 2) errors.college = 'Enter your college name.';
+  if (password.length < 6) errors.password = 'At least 6 characters.';
+  return errors;
+};
 
 function Signup() {
+  const navigate = useNavigate();
+  const { user, toast } = useApp();
 
-    const [username, setusername] = useState('');
-    const [password, setpassword] = useState('');
-    const [email, setemail] = useState('');
-    const [mobile, setmobile] = useState('');
+  const [form, setform] = useState({ username: '', email: '', mobile: '', college: '', password: '' });
+  const [errors, seterrors] = useState({});
+  const [error, seterror] = useState('');
+  const [busy, setbusy] = useState(false);
 
+  if (user) {
+    return <Navigate to="/" replace />;
+  }
 
-    const handleApi = () => {
-        const url = API_URL + '/signup';
-        const data = { username, password, mobile, email };
-        axios.post(url, data)
-            .then((res) => {
-                if (res.data.message) {
-                    alert(res.data.message);
-                }
-            })
-            .catch((err) => {
-                alert('SERVER ERR')
-            })
-    }
-    return (
-        <div style={{ backgroundColor: "#f5f5f5", minHeight: "100vh" }}>
-        <Header />
-        <div className="container d-flex justify-content-center align-items-center" style={{ minHeight: "80vh" }}>
-          <div className="card shadow p-4" style={{ width: "100%", maxWidth: "400px" }}>
-            <h3 className="text-center mb-4 text-primary">Welcome to Signup Page</h3>
-  
-            <div className="mb-3">
-              <label className="form-label">Username</label>
-              <div className="input-group">
-                <span className="input-group-text"><FaUser /></span>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={username}
-                  placeholder="Enter username"
-                  onChange={(e) => setusername(e.target.value)}
-                />
-              </div>
-            </div>
-  
-            <div className="mb-3">
-              <label className="form-label">Mobile</label>
-              <div className="input-group">
-                <span className="input-group-text"><FaPhone /></span>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={mobile}
-                  placeholder="Enter mobile number"
-                  onChange={(e) => setmobile(e.target.value)}
-                />
-              </div>
-            </div>
-  
-            <div className="mb-3">
-              <label className="form-label">Email</label>
-              <div className="input-group">
-                <span className="input-group-text"><FaEnvelope /></span>
-                <input
-                  type="email"
-                  className="form-control"
-                  value={email}
-                  placeholder="Enter email"
-                  onChange={(e) => setemail(e.target.value)}
-                />
-              </div>
-            </div>
-  
-            <div className="mb-3">
-              <label className="form-label">Password</label>
-              <div className="input-group">
-                <span className="input-group-text"><FaLock /></span>
-                <input
-                  type="password"
-                  className="form-control"
-                  value={password}
-                  placeholder="Enter password"
-                  onChange={(e) => setpassword(e.target.value)}
-                />
-              </div>
-            </div>
-  
-            <button className="btn btn-success w-100 mb-3" onClick={handleApi}>
-              Sign Up
-            </button>
-  
-            <div className="text-center">
-              <span>Already have an account?</span>
-              <Link className="ms-2 text-decoration-none text-primary" to="/login">
-                Login
-              </Link>
-            </div>
-          </div>
+  const set = (key) => (e) => {
+    setform({ ...form, [key]: e.target.value });
+    if (errors[key]) seterrors({ ...errors, [key]: undefined });
+  };
+
+  const handleApi = (e) => {
+    e.preventDefault();
+    const found = validate(form);
+    seterrors(found);
+    if (Object.keys(found).length) return;
+
+    setbusy(true);
+    seterror('');
+    axios.post(API_URL + '/signup', form)
+      .then(() => {
+        toast('Account created. Log in to get started.');
+        navigate('/login');
+      })
+      .catch((err) => {
+        seterror(errorMessage(err));
+        setbusy(false);
+      });
+  };
+
+  const input = (key, props) => (
+    <input className={'input' + (errors[key] ? ' invalid' : '')} value={form[key]} onChange={set(key)} {...props} />
+  );
+
+  return (
+    <div className="auth">
+      <form className="panel auth-card" onSubmit={handleApi} noValidate>
+        <h1>Create your account</h1>
+        <p className="muted">Join your campus marketplace in a minute.</p>
+
+        {error && <div className="alert" role="alert">{error}</div>}
+
+        <Field label="Username" error={errors.username}>
+          {input('username', { type: 'text', autoComplete: 'username', autoFocus: true })}
+        </Field>
+        <Field label="College" error={errors.college}>
+          {input('college', { type: 'text', placeholder: 'e.g. IIT Delhi' })}
+        </Field>
+        <div className="row-2">
+          <Field label="Email" error={errors.email}>
+            {input('email', { type: 'email', autoComplete: 'email' })}
+          </Field>
+          <Field label="Mobile" error={errors.mobile}>
+            {input('mobile', { type: 'tel', inputMode: 'numeric', maxLength: 10, autoComplete: 'tel' })}
+          </Field>
         </div>
-      </div>
-    )
+        <Field label="Password" error={errors.password} hint="At least 6 characters.">
+          {input('password', { type: 'password', autoComplete: 'new-password' })}
+        </Field>
+
+        <button className="btn btn-block" type="submit" disabled={busy}>
+          {busy ? 'Creating account…' : 'Create account'}
+        </button>
+
+        <div className="auth-foot">
+          Already have an account? <Link className="link" to="/login">Log in</Link>
+        </div>
+      </form>
+    </div>
+  );
 }
 
 export default Signup;
